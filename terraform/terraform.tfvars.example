@@ -1,0 +1,20 @@
+# Example Terraform variables file
+# Copy this to terraform.tfvars and fill in your values
+
+# AWS Configuration
+aws_region = "us-east-1"
+environment = "dev"
+
+# Container Configuration
+container_cpu    = 512   # 0.5 vCPU
+container_memory = 1024  # 1 GB RAM
+desired_count    = 1     # Number of container instances
+
+# API Keys (REQUIRED - replace with your actual keys)
+anthropic_api_key  = "your-anthropic-api-key-here"
+langsmith_api_key  = "your-langsmith-api-key-here"
+chicago_data_token = "your-chicago-data-token-here"
+
+# Optional: SSL Configuration
+# domain_name     = "your-domain.com"
+# certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/your-cert-id"

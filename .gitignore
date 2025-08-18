@@ -1,0 +1,264 @@
+# Chicago Crime Analysis Project - Git Ignore File
+# Protects sensitive data and development artifacts
+
+# =====================================================
+# SENSITIVE DATA - NEVER COMMIT THESE!
+# =====================================================
+
+# Environment Variables & API Keys
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*
+
+# Terraform State Files (contain sensitive data)
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfstate.backup
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+terraform/crash.log
+terraform/crash.*.log
+
+# AWS Credentials
+.aws/
+aws-credentials.json
+
+# =====================================================
+# PYTHON & VIRTUAL ENVIRONMENTS
+# =====================================================
+
+# Virtual Environments
+chicago_crime_env/
+chicago_crime_env_homebrew/
+venv/
+env/
+ENV/
+.venv/
+.ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# =====================================================
+# LOGS & TEMPORARY FILES
+# =====================================================
+
+# Application Logs
+*.log
+logs/
+log_files/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.Trash-*
+
+# Windows
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# =====================================================
+# IDE & EDITOR FILES
+# =====================================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.swp
+*.swo
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*~
+*.swp
+*.swo
+Session.vim
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# =====================================================
+# DOCKER & CONTAINERS
+# =====================================================
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# =====================================================
+# STREAMLIT SPECIFIC
+# =====================================================
+
+# Streamlit cache and config
+.streamlit/
+
+# =====================================================
+# DATA FILES (if applicable)
+# =====================================================
+
+# Large data files
+*.csv
+*.json
+*.parquet
+*.h5
+*.hdf5
+data/
+datasets/
+
+# Except small example/config files
+!example_data.json
+!config.json
+
+# =====================================================
+# BACKUP FILES
+# =====================================================
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# =====================================================
+# MISCELLANEOUS
+# =====================================================
+
+# Node modules (if any JS tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Package files
+*.tgz
+*.tar.gz
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output
+
+# =====================================================
+# PROJECT SPECIFIC
+# =====================================================
+
+# Test output files
+test_results/
+test_*.json
+*_test_output.*
+
+# Local configuration overrides
+local_config.py
+local_settings.py
+
+# Temporary analysis files
+analysis_*.md
+crime_analysis_*.md
+
+# Downloaded images or assets (if any)
+assets/downloaded/
+images/temp/
+
+# =====================================================
+# KEEP THESE EXAMPLE FILES
+# =====================================================
+
+# We want to keep these template files
+!terraform/terraform.tfvars.example
+!.env.example
+!config.example.json
+!README.md
+!requirements.txt
+!Dockerfile
+!.dockerignore
+
+# =====================================================
+# DOCUMENTATION EXCEPTIONS
+# =====================================================
+
+# Keep documentation
+!docs/
+!*.md
+
+# Keep workflow files
+!.github/
