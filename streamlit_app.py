@@ -9,7 +9,7 @@ load_dotenv()
 
 # Page configuration
 st.set_page_config(
-    page_title="Chicago Crime Intelligence Assistant",
+    page_title="Multi-City Crime Intelligence Assistant",
     page_icon="🚨",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -53,31 +53,23 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def initialize_system():
-    """Initialize the crime analysis system."""
+    """Initialize the multi-city crime analysis system."""
     if 'system_initialized' not in st.session_state:
         st.session_state.system_initialized = False
         st.session_state.initialization_error = None
-        st.session_state.crime_tool = None
-        st.session_state.crime_agent = None
-        st.session_state.safety_system = None
+        st.session_state.multi_city_agent = None
     
     if not st.session_state.system_initialized:
         try:
-            with st.spinner("Initializing Chicago Crime Analysis System..."):
-                # Import optimized components
-                from chicago_crime_tool_optimized import ChicagoCrimeTool
-                from chicago_crime_agent_fixed import ChicagoCrimeAgent
-                from safety_advisory_system import SafetyAdvisorySystem
+            with st.spinner("Initializing Multi-City Crime Analysis System..."):
+                # Import multi-city agent
+                from multi_city_crime_agent import MultiCityCrimeAgent
                 
-                # Initialize components
-                crime_tool = ChicagoCrimeTool(app_token=os.getenv("CHICAGO_DATA_APP_TOKEN"))
-                crime_agent = ChicagoCrimeAgent(crime_tool)
-                safety_system = SafetyAdvisorySystem(crime_agent)
+                # Initialize multi-city agent
+                multi_city_agent = MultiCityCrimeAgent()
                 
                 # Store in session state
-                st.session_state.crime_tool = crime_tool
-                st.session_state.crime_agent = crime_agent
-                st.session_state.safety_system = safety_system
+                st.session_state.multi_city_agent = multi_city_agent
                 st.session_state.system_initialized = True
                 
                 return True
@@ -91,16 +83,31 @@ def initialize_system():
 def main():
     """Main application function."""
     
+    # Initialize session state variables first
+    if 'selected_city' not in st.session_state:
+        st.session_state.selected_city = 'chicago'  # Default to Chicago
+    
     # Header
-    st.markdown('<h1 class="main-header">🚨 Chicago Crime Intelligence Assistant</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #666;">Powered by Claude AI and Chicago Police Department Data</p>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🚨 Multi-City Crime Intelligence Assistant</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #666;">Powered by Claude AI with Chicago & Dallas Police Data</p>', unsafe_allow_html=True)
     
     # Sidebar
     st.sidebar.header("🔧 System Configuration")
     
+    # City Selection
+    st.sidebar.subheader("🏙️ City Selection")
+    selected_city = st.sidebar.selectbox(
+        "Choose a city to analyze:",
+        ["chicago", "dallas"],
+        format_func=lambda x: x.title(),
+        index=0 if st.session_state.selected_city == "chicago" else 1
+    )
+    st.session_state.selected_city = selected_city
+    
     # Check environment setup
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     chicago_token = os.getenv("CHICAGO_DATA_APP_TOKEN")
+    dallas_token = os.getenv("DALLAS_DATA_APP_TOKEN")
     
     st.sidebar.subheader("Environment Status")
     if anthropic_key:
@@ -114,6 +121,12 @@ def main():
     else:
         st.sidebar.warning("⚠️ Chicago Data Token not configured (optional)")
         st.sidebar.info("Consider adding CHICAGO_DATA_APP_TOKEN for better performance")
+        
+    if dallas_token:
+        st.sidebar.success("✅ Dallas Data Token configured")
+    else:
+        st.sidebar.warning("⚠️ Dallas Data Token not configured (optional)")
+        st.sidebar.info("Consider adding DALLAS_DATA_APP_TOKEN for better performance")
     
     # Initialize system
     if not anthropic_key:
@@ -159,24 +172,35 @@ def main():
 
 def basic_analysis_mode():
     """Basic crime analysis interface."""
-    st.header("🔍 Basic Crime Analysis")
-    st.write("Ask questions about Chicago crime data and get AI-powered insights.")
+    selected_city = st.session_state.selected_city
+    st.header(f"🔍 {selected_city.title()} Crime Analysis")
+    st.write(f"Ask questions about {selected_city.title()} crime data and get AI-powered insights.")
     
-    # Add optimization notice
+    # Add city-specific optimization notice
     with st.expander("⚙️ System Optimizations"):
-        st.success("✅ **Optimized for Performance**: This system now uses timeout-optimized queries with proper API token authentication.")
+        st.success(f"✅ **City-Optimized**: This system uses {selected_city.title()}-specific timeout-optimized queries with proper API authentication.")
         st.info("💡 **Recent Data**: Queries fetch sample data from recent crime patterns without date filtering to avoid API timeouts.")
         st.warning("⏰ **Timeout Handling**: If queries timeout, the system will skip LLM processing and provide clear error messages.")
+        st.info(f"🏙️ **Multi-City Support**: Switch between cities using the sidebar selector. Each city has optimized API handling.")
     
-    # Example queries
+    # City-specific example queries
     st.subheader("💡 Example Questions")
-    examples = [
-        "What are recent crime trends in downtown Chicago?",
-        "Show me crime statistics for Lincoln Park",
-        "Is Wicker Park safe for tourists?",
-        "What types of crimes are most common in Chicago?",
-        "Analyze crime patterns in the Loop area"
-    ]
+    if selected_city == "chicago":
+        examples = [
+            "What are recent crime trends in downtown Chicago?",
+            "Show me crime statistics for Lincoln Park",
+            "Is Wicker Park safe for tourists?",
+            "What types of crimes are most common in Chicago?",
+            "Analyze crime patterns in the Loop area"
+        ]
+    else:  # Dallas
+        examples = [
+            "What are recent crime trends in downtown Dallas?",
+            "Show me crime statistics for Deep Ellum",
+            "Is Uptown Dallas safe for residents?",
+            "What types of crimes are most common in Dallas?",
+            "Analyze crime patterns in the Arts District"
+        ]
     
     col1, col2 = st.columns(2)
     for i, example in enumerate(examples):
@@ -191,28 +215,31 @@ def basic_analysis_mode():
     user_query = st.text_area(
         "Your Question:",
         value=st.session_state.get('user_query', ''),
-        placeholder="Ask about Chicago crime data...",
+        placeholder=f"Ask about {selected_city.title()} crime data...",
         height=100
     )
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        analyze_button = st.button("🔍 Analyze Crime Data", type="primary", use_container_width=True)
+        analyze_button = st.button(f"🔍 Analyze {selected_city.title()} Crime Data", type="primary", use_container_width=True)
     
     if analyze_button and user_query:
-        with st.spinner("🔍 Analyzing Chicago crime data with Claude..."):
+        with st.spinner(f"🔍 Analyzing {selected_city.title()} crime data with Claude..."):
             try:
-                response = st.session_state.crime_agent.analyze_crime(user_query)
+                response = st.session_state.multi_city_agent.analyze_crime(
+                    user_query, 
+                    selected_city=selected_city
+                )
                 
-                st.success("✅ Analysis Complete")
-                st.markdown("### 📊 Analysis Results")
+                st.success(f"✅ {selected_city.title()} Analysis Complete")
+                st.markdown(f"### 📊 {selected_city.title()} Analysis Results")
                 st.markdown(response)
                 
                 # Add download option
                 st.download_button(
                     label="📥 Download Analysis",
                     data=response,
-                    file_name=f"chicago_crime_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                    file_name=f"{selected_city}_crime_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
                     mime="text/markdown"
                 )
                 
@@ -223,23 +250,33 @@ def basic_analysis_mode():
 
 def safety_advisory_mode():
     """Safety advisory interface with human-in-the-loop."""
+    selected_city = st.session_state.selected_city
     st.header("🛡️ Safety Advisory System")
-    st.write("Get safety recommendations with human oversight for critical queries.")
+    st.write(f"Get {selected_city.title()}-specific safety recommendations with human oversight for critical queries.")
     
     st.info("🔍 High-risk safety queries will be flagged for human review before providing recommendations.")
     
     # Add notice about optimized data
-    st.info("ℹ️ Safety recommendations are based on recent sample crime data due to API optimization. The system uses the most current available data patterns.")
+    st.info(f"ℹ️ Safety recommendations are based on recent sample {selected_city.title()} crime data due to API optimization. The system uses the most current available data patterns.")
     
-    # Safety query examples
+    # City-specific safety query examples
     st.subheader("💡 Safety Questions")
-    safety_examples = [
-        "Is it safe to walk alone at night in downtown Chicago?",
-        "I'm moving to Lincoln Park with my family - what should I know about safety?",
-        "What safety precautions should tourists take in Chicago?",
-        "Are there any areas in Chicago I should avoid?",
-        "Safety tips for using public transportation in Chicago"
-    ]
+    if selected_city == "chicago":
+        safety_examples = [
+            "Is it safe to walk alone at night in downtown Chicago?",
+            "I'm moving to Lincoln Park with my family - what should I know about safety?",
+            "What safety precautions should tourists take in Chicago?",
+            "Are there any areas in Chicago I should avoid?",
+            "Safety tips for using public transportation in Chicago"
+        ]
+    else:  # Dallas
+        safety_examples = [
+            "Is it safe to walk alone at night in downtown Dallas?",
+            "I'm moving to Uptown Dallas with my family - what should I know about safety?",
+            "What safety precautions should tourists take in Dallas?",
+            "Are there any areas in Dallas I should avoid?",
+            "Safety tips for using DART public transportation in Dallas"
+        ]
     
     for i, example in enumerate(safety_examples):
         if st.button(f"🛡️ {example}", key=f"safety_example_{i}"):
@@ -249,32 +286,38 @@ def safety_advisory_mode():
     safety_query = st.text_area(
         "Your Safety Question:",
         value=st.session_state.get('safety_query', ''),
-        placeholder="Ask about safety in Chicago...",
+        placeholder=f"Ask about safety in {selected_city.title()}...",
         height=100
     )
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        safety_button = st.button("🛡️ Get Safety Advice", type="primary", use_container_width=True)
+        safety_button = st.button(f"🛡️ Get {selected_city.title()} Safety Advice", type="primary", use_container_width=True)
     
     if safety_button and safety_query:
-        with st.spinner("🔍 Analyzing safety considerations..."):
+        # For now, use the multi-city agent for safety analysis
+        with st.spinner(f"🔍 Analyzing {selected_city.title()} safety considerations..."):
             try:
-                response = st.session_state.safety_system.get_safety_advice(safety_query)
+                # Use the multi-city agent with a safety-focused query
+                safety_focused_query = f"Safety analysis: {safety_query}"
+                response = st.session_state.multi_city_agent.analyze_crime(
+                    safety_focused_query,
+                    selected_city=selected_city
+                )
                 
                 if "human review" in response.lower() or "interrupt" in response.lower():
                     st.warning("⏸️ This query requires human review. In a production system, a human moderator would review this before providing recommendations.")
                     st.info("🔄 For this demo, the system would pause here for human input.")
                 
-                st.success("✅ Safety Analysis Complete")
-                st.markdown("### 🛡️ Safety Recommendations")
+                st.success(f"✅ {selected_city.title()} Safety Analysis Complete")
+                st.markdown(f"### 🛡️ {selected_city.title()} Safety Recommendations")
                 st.markdown(response)
                 
                 # Add download option
                 st.download_button(
                     label="📥 Download Safety Report",
                     data=response,
-                    file_name=f"chicago_safety_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                    file_name=f"{selected_city}_safety_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
                     mime="text/markdown"
                 )
                 
@@ -283,17 +326,18 @@ def safety_advisory_mode():
                     st.warning("⏸️ This query has been flagged for human review.")
                     st.info("In a production system, a human moderator would review this query before providing safety recommendations.")
                 else:
-                    st.error(f"❌ Safety analysis failed: {e}")
+                    st.error(f"❌ {selected_city.title()} safety analysis failed: {e}")
                     with st.expander("Show Error Details"):
                         st.code(traceback.format_exc())
 
 def direct_tool_mode():
     """Direct tool query interface."""
+    selected_city = st.session_state.selected_city
     st.header("🔧 Direct Tool Query")
-    st.write("Query the Chicago crime database directly with specific parameters.")
+    st.write(f"Query the {selected_city.title()} crime database directly with specific parameters.")
     
     # Add optimization info
-    st.info("⚙️ **Optimized Mode**: This tool uses the new timeout-optimized Chicago crime API client with proper authentication and fallback strategies.")
+    st.info(f"⚙️ **Optimized Mode**: This tool uses the new timeout-optimized {selected_city.title()} crime API client with proper authentication and fallback strategies.")
     
     # Query parameters
     col1, col2 = st.columns(2)
@@ -331,8 +375,14 @@ def direct_tool_mode():
         query_button = st.button("🔍 Execute Query", type="primary", use_container_width=True)
     
     if query_button:
-        with st.spinner("📡 Querying Chicago Police Database..."):
+        with st.spinner(f"📡 Querying {selected_city.title()} Police Database..."):
             try:
+                # Get the appropriate city tool
+                if selected_city == "chicago":
+                    city_tool = st.session_state.multi_city_agent.chicago_tool
+                else:  # dallas
+                    city_tool = st.session_state.multi_city_agent.dallas_tool
+                
                 # Build parameters for optimized tool
                 params = {
                     "query_type": query_type,
@@ -345,7 +395,7 @@ def direct_tool_mode():
                     params["crime_type"] = crime_type
                 
                 # Execute query
-                result = st.session_state.crime_tool._run(**params)
+                result = city_tool._run(**params)
                 
                 st.success("✅ Query Executed Successfully")
                 st.markdown("### 📊 Query Results")
@@ -367,16 +417,16 @@ def direct_tool_mode():
                         st.text(result)
                         
                     # Show timeout statistics
-                    if hasattr(st.session_state.crime_tool, 'get_timeout_stats'):
-                        timeout_stats = st.session_state.crime_tool.get_timeout_stats()
+                    if hasattr(city_tool, 'get_timeout_stats'):
+                        timeout_stats = city_tool.get_timeout_stats()
                         if timeout_stats['timeout_count'] > 0:
-                            st.warning(f"⚠️ API Timeouts: {timeout_stats['timeout_count']} (threshold: {timeout_stats['timeout_threshold']}s)")
+                            st.warning(f"⚠️ {selected_city.title()} API Timeouts: {timeout_stats['timeout_count']} (threshold: {timeout_stats['timeout_threshold']}s)")
                 
                 # Add download option
                 st.download_button(
                     label="📥 Download Results",
                     data=result,
-                    file_name=f"chicago_crime_query_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                    file_name=f"{selected_city}_crime_query_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                     mime="text/plain"
                 )
                 
