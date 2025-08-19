@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 
 # Import our custom tool and LangSmith observability
-from chicago_crime_tool_fixed import ChicagoCrimeTool
+from chicago_crime_tool_optimized import ChicagoCrimeTool
 from langsmith_config import (
     observability, 
     trace_crime_analysis, 
@@ -141,12 +141,16 @@ class ChicagoCrimeAgent:
         def fetch_crime_data_node(state: ChicagoCrimeAgentState):
             """Fetch relevant crime data from Chicago database."""
             try:
-                crime_data = self.crime_tool._run(
-                    query_type=state["analysis_type"],
-                    location=state["user_location"] if state["user_location"] else None,
-                    date_range="last_7_days",
-                    limit=500
-                )
+                # Build parameters for optimized tool (no date_range)
+                params = {
+                    "query_type": state["analysis_type"],
+                    "limit": 100  # Reduced for better performance
+                }
+                
+                if state["user_location"]:
+                    params["location"] = state["user_location"]
+                
+                crime_data = self.crime_tool._run(**params)
                 
                 return {"crime_data": {"raw_data": crime_data}}
                 

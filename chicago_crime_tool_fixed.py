@@ -16,8 +16,12 @@ from typing import Optional, Type, Any
 from pydantic import BaseModel, Field, PrivateAttr
 import json
 import os
+import time
+import requests
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
 class ChicagoCrimeInput(BaseModel):
@@ -25,7 +29,7 @@ class ChicagoCrimeInput(BaseModel):
     query_type: str = Field(description="Type of query: 'recent_crimes', 'crime_stats', 'location_analysis', 'trend_analysis'")
     location: Optional[str] = Field(default=None, description="Specific address, neighborhood, or ward")
     crime_type: Optional[str] = Field(default=None, description="Type of crime: THEFT, BATTERY, BURGLARY, etc.")
-    date_range: Optional[str] = Field(default="last_7_days", description="Time period: last_7_days, last_30_days, last_year, or custom YYYY-MM-DD format")
+    date_range: Optional[str] = Field(default="last_3_days", description="Time period: last_3_days, last_7_days, last_30_days, last_year, or custom YYYY-MM-DD format")
     limit: Optional[int] = Field(default=100, description="Number of records to return (max 50000)")
 
 class ChicagoCrimeTool(BaseTool):
@@ -41,10 +45,14 @@ class ChicagoCrimeTool(BaseTool):
     # Private attributes for Pydantic v2 compatibility
     _client: Optional[Socrata] = PrivateAttr(default=None)
     _dataset_id: str = PrivateAttr(default="ijzp-q8t2")
+    _timeout_seconds: int = PrivateAttr(default=30)
+    _timeout_count: int = PrivateAttr(default=0)
     
     def __init__(self, app_token: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         self._client = Socrata("data.cityofchicago.org", app_token)
+        # Set timeout on the session object (sodapy doesn't support timeout parameter in get())
+        self._client.session.timeout = self._timeout_seconds
         self._dataset_id = "ijzp-q8t2"  # Main crime dataset
     
     def _run(
@@ -52,7 +60,7 @@ class ChicagoCrimeTool(BaseTool):
         query_type: str,
         location: Optional[str] = None,
         crime_type: Optional[str] = None,
-        date_range: str = "last_7_days",
+        date_range: str = "last_3_days",
         limit: int = 100,
         run_manager: Optional[Any] = None,  # Made generic to handle different LangChain versions
     ) -> str:
@@ -62,13 +70,29 @@ class ChicagoCrimeTool(BaseTool):
             # Build SoQL query based on parameters
             where_clauses = []
             
-            # Date filtering - using more recent dates for testing
-            if date_range == "last_7_days":
-                where_clauses.append("date >= '2024-08-01T00:00:00'")
+            # Date filtering - dynamic dates based on current time
+            now = datetime.now()
+            if date_range == "last_3_days":
+                start_date = (now - timedelta(days=3)).strftime('%Y-%m-%dT00:00:00')
+                where_clauses.append(f"date >= '{start_date}'")
+            elif date_range == "last_7_days":
+                start_date = (now - timedelta(days=7)).strftime('%Y-%m-%dT00:00:00')
+                where_clauses.append(f"date >= '{start_date}'")
             elif date_range == "last_30_days":
-                where_clauses.append("date >= '2024-07-01T00:00:00'")
+                start_date = (now - timedelta(days=30)).strftime('%Y-%m-%dT00:00:00')
+                where_clauses.append(f"date >= '{start_date}'")
             elif date_range == "last_year":
-                where_clauses.append("date >= '2023-08-01T00:00:00'")
+                start_date = (now - timedelta(days=365)).strftime('%Y-%m-%dT00:00:00')
+                where_clauses.append(f"date >= '{start_date}'")
+            elif date_range and "-" in date_range:  # Custom date format YYYY-MM-DD
+                try:
+                    # Validate date format
+                    datetime.strptime(date_range, '%Y-%m-%d')
+                    where_clauses.append(f"date >= '{date_range}T00:00:00'")
+                except ValueError:
+                    print(f"Warning: Invalid date format '{date_range}', using last_3_days instead")
+                    start_date = (now - timedelta(days=3)).strftime('%Y-%m-%dT00:00:00')
+                    where_clauses.append(f"date >= '{start_date}'")
             
             # Crime type filtering
             if crime_type:
@@ -116,8 +140,28 @@ class ChicagoCrimeTool(BaseTool):
             
             print(f"Executing query: {query}")  # Debug output
             
-            # Execute query
-            results = self._client.get(self._dataset_id, query=query)
+            # Execute query with timeout monitoring
+            start_time = time.time()
+            try:
+                # Timeout is set on client.session.timeout in __init__
+                results = self._client.get(self._dataset_id, query=query)
+                query_time = time.time() - start_time
+                print(f"Query completed in {query_time:.2f} seconds")
+                
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout) as e:
+                self._timeout_count += 1
+                query_time = time.time() - start_time
+                error_msg = f"Chicago API timeout after {query_time:.2f} seconds (timeout #{self._timeout_count}). Skipping LLM processing to avoid incomplete data."
+                print(error_msg)
+                return f"DATABASE_TIMEOUT: {error_msg}"
+            except Exception as e:
+                query_time = time.time() - start_time
+                if "timeout" in str(e).lower() or "timed out" in str(e).lower():
+                    self._timeout_count += 1
+                    error_msg = f"Chicago API timeout after {query_time:.2f} seconds (timeout #{self._timeout_count}). Skipping LLM processing."
+                    print(error_msg)
+                    return f"DATABASE_TIMEOUT: {error_msg}"
+                raise e
             
             if not results:
                 return "No crime data found for the specified criteria."
@@ -137,7 +181,21 @@ class ChicagoCrimeTool(BaseTool):
                 return self._format_general_summary(df)
                 
         except Exception as e:
+            if "timeout" in str(e).lower() or "timed out" in str(e).lower():
+                self._timeout_count += 1
+                return f"DATABASE_TIMEOUT: Chicago API timeout (timeout #{self._timeout_count}). Skipping LLM processing."
             return f"Error querying Chicago crime database: {str(e)}"
+    
+    def get_timeout_stats(self) -> dict:
+        """Get timeout monitoring statistics."""
+        return {
+            "timeout_count": self._timeout_count,
+            "timeout_threshold": self._timeout_seconds
+        }
+    
+    def reset_timeout_count(self) -> None:
+        """Reset the timeout counter."""
+        self._timeout_count = 0
     
     def _format_recent_crimes(self, df: pd.DataFrame) -> str:
         """Format recent crimes for readability."""
@@ -237,6 +295,7 @@ def test_tool():
     print("Testing Chicago Crime Tool...")
     
     try:
+        # Environment variables are already loaded at module level
         tool = ChicagoCrimeTool(app_token=os.getenv("CHICAGO_DATA_APP_TOKEN"))
         
         result = tool._run(

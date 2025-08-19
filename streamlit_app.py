@@ -64,8 +64,8 @@ def initialize_system():
     if not st.session_state.system_initialized:
         try:
             with st.spinner("Initializing Chicago Crime Analysis System..."):
-                # Import components
-                from chicago_crime_tool_fixed import ChicagoCrimeTool
+                # Import optimized components
+                from chicago_crime_tool_optimized import ChicagoCrimeTool
                 from chicago_crime_agent_fixed import ChicagoCrimeAgent
                 from safety_advisory_system import SafetyAdvisorySystem
                 
@@ -162,6 +162,12 @@ def basic_analysis_mode():
     st.header("🔍 Basic Crime Analysis")
     st.write("Ask questions about Chicago crime data and get AI-powered insights.")
     
+    # Add optimization notice
+    with st.expander("⚙️ System Optimizations"):
+        st.success("✅ **Optimized for Performance**: This system now uses timeout-optimized queries with proper API token authentication.")
+        st.info("💡 **Recent Data**: Queries fetch sample data from recent crime patterns without date filtering to avoid API timeouts.")
+        st.warning("⏰ **Timeout Handling**: If queries timeout, the system will skip LLM processing and provide clear error messages.")
+    
     # Example queries
     st.subheader("💡 Example Questions")
     examples = [
@@ -221,6 +227,9 @@ def safety_advisory_mode():
     st.write("Get safety recommendations with human oversight for critical queries.")
     
     st.info("🔍 High-risk safety queries will be flagged for human review before providing recommendations.")
+    
+    # Add notice about optimized data
+    st.info("ℹ️ Safety recommendations are based on recent sample crime data due to API optimization. The system uses the most current available data patterns.")
     
     # Safety query examples
     st.subheader("💡 Safety Questions")
@@ -283,13 +292,16 @@ def direct_tool_mode():
     st.header("🔧 Direct Tool Query")
     st.write("Query the Chicago crime database directly with specific parameters.")
     
+    # Add optimization info
+    st.info("⚙️ **Optimized Mode**: This tool uses the new timeout-optimized Chicago crime API client with proper authentication and fallback strategies.")
+    
     # Query parameters
     col1, col2 = st.columns(2)
     
     with col1:
         query_type = st.selectbox(
             "Query Type:",
-            ["recent_crimes", "crime_stats", "location_analysis", "trend_analysis"]
+            ["recent_crimes", "crime_stats", "location_analysis"]
         )
         
         location = st.text_input(
@@ -304,16 +316,15 @@ def direct_tool_mode():
         )
         
         limit = st.number_input(
-            "Number of records:",
+            "Number of records (recommended 10-100):",
             min_value=1,
             max_value=1000,
-            value=100
+            value=50,
+            help="Smaller limits work better due to API timeout constraints"
         )
     
-    date_range = st.selectbox(
-        "Time Period:",
-        ["last_7_days", "last_30_days", "last_year"]
-    )
+    # Remove date_range since optimized tool doesn't support it due to timeout constraints
+    st.info("⚠️ Note: The optimized tool fetches recent sample data without date filtering to avoid API timeouts. Results represent recent crime patterns.")
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -322,10 +333,9 @@ def direct_tool_mode():
     if query_button:
         with st.spinner("📡 Querying Chicago Police Database..."):
             try:
-                # Build parameters
+                # Build parameters for optimized tool
                 params = {
                     "query_type": query_type,
-                    "date_range": date_range,
                     "limit": limit
                 }
                 
@@ -340,15 +350,27 @@ def direct_tool_mode():
                 st.success("✅ Query Executed Successfully")
                 st.markdown("### 📊 Query Results")
                 
-                # Display results in a nice format
-                if len(result) > 2000:
-                    st.markdown("**Result Preview (first 2000 characters):**")
-                    st.text(result[:2000] + "...")
-                    
-                    with st.expander("Show Full Results"):
-                        st.text(result)
+                # Handle timeout responses
+                if result.startswith("DATABASE_TIMEOUT:"):
+                    st.warning("⏰ Query timed out due to API constraints")
+                    st.error(result)
+                    st.info("💡 Try reducing the limit or simplifying your query parameters.")
                 else:
-                    st.text(result)
+                    # Display successful results
+                    if len(result) > 2000:
+                        st.markdown("**Result Preview (first 2000 characters):**")
+                        st.text(result[:2000] + "...")
+                        
+                        with st.expander("Show Full Results"):
+                            st.text(result)
+                    else:
+                        st.text(result)
+                        
+                    # Show timeout statistics
+                    if hasattr(st.session_state.crime_tool, 'get_timeout_stats'):
+                        timeout_stats = st.session_state.crime_tool.get_timeout_stats()
+                        if timeout_stats['timeout_count'] > 0:
+                            st.warning(f"⚠️ API Timeouts: {timeout_stats['timeout_count']} (threshold: {timeout_stats['timeout_threshold']}s)")
                 
                 # Add download option
                 st.download_button(
